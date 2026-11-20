@@ -401,25 +401,31 @@ func writeScript(t *testing.T, content string) string {
 	return path
 }
 
-// Native CLI preparation creates the toolchain for custom images only:
-// sandboxes of the platform's isolated image already carry these tools.
+// Native CLI preparation copies bundled CLIs into the host toolchain for every
+// sandbox, including the shared isolated runtime image (cursor-agent is not
+// baked into that image). Routine sandbox commands only mount a ready toolchain
+// for custom images; isolated sandboxes rely on conversation-cli after prep.
 func TestToolchainCLIExecEnvOnlyForCustomImages(t *testing.T) {
 	prefix := writeToolchainFixture(t)
 	cliDir := t.TempDir()
 	useToolchainFixture(t, prefix, cliDir)
 	t.Setenv("AGENTFLOW_ISOLATED_IMAGE", "loopforge-runtime:test")
 
-	platform := &dockerSandbox{dockerfile: domain.DockerfileDefinition{Content: IsolatedDockerfile}}
-	if env, err := platform.toolchainCLIExecEnv("fakecli"); err != nil || env != nil {
-		t.Fatalf("platform image CLI exec env = %v, %v; want none", env, err)
+	isolated := &dockerSandbox{dockerfile: domain.DockerfileDefinition{Content: IsolatedDockerfile}}
+	dir := filepath.Join(cliDir, "toolchain", "testbuild")
+	env, err := isolated.toolchainCLIExecEnv("fakecli")
+	if err != nil || !slices.Equal(env, []string{"-e", toolchainEnv + "=" + dir}) {
+		t.Fatalf("isolated runtime CLI exec env = %v, %v", env, err)
 	}
-	if _, err := os.Stat(filepath.Join(cliDir, "toolchain")); !os.IsNotExist(err) {
-		t.Fatalf("platform image sandbox copied the toolchain: %v", err)
+	if !fileIsExecutable(filepath.Join(dir, "bin", "fakecli")) {
+		t.Fatal("isolated runtime CLI preparation did not copy the bundled CLI")
+	}
+	if got := isolated.toolchainExecEnv(); got != nil {
+		t.Fatalf("isolated runtime routine exec env = %v, want none until published", got)
 	}
 
 	custom := &dockerSandbox{dockerfile: domain.DockerfileDefinition{Content: "FROM debian:bookworm\n"}}
-	dir := filepath.Join(cliDir, "toolchain", "testbuild")
-	env, err := custom.toolchainCLIExecEnv("fakecli")
+	env, err = custom.toolchainCLIExecEnv("fakecli")
 	if err != nil || !slices.Equal(env, []string{"-e", toolchainEnv + "=" + dir}) {
 		t.Fatalf("custom image CLI exec env = %v, %v", env, err)
 	}

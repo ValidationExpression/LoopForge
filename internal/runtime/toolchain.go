@@ -358,12 +358,11 @@ func copyPreserving(dst string, sources ...string) error {
 	return nil
 }
 
-// sandboxToolchain is the toolchain a sandbox of a custom image should see.
-// Sandboxes of the platform image already carry these tools.
+// sandboxToolchain publishes the host toolchain for native CLI preparation.
+// Sandboxes of the shared isolated runtime image still need bundled CLIs such as
+// cursor-agent copied in: that image ships CodeBuddy/Codex, not every bundled
+// agent, and it does not mount the platform's offline CLI tree.
 func (s *dockerSandbox) sandboxToolchain() (string, error) {
-	if isolatedRuntimeImage(s.dockerfile) != "" {
-		return "", nil
-	}
 	return RuntimeToolchainDir()
 }
 
