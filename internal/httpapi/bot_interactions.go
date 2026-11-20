@@ -71,16 +71,19 @@ func (h *assistantHandlers) generateBotReply(ctx context.Context, bot domain.Not
 	if err != nil {
 		return "绑定的平台账号不可用或已失去项目权限，请在平台检查配置。", nil
 	}
-	if strings.TrimSpace(user.CodeBuddyAPIKey) == "" {
-		return "你的平台账号尚未配置 CodeBuddy Key，请在平台个人配置中配置。", nil
+	engine, _ := assistantModelEngine(bot.Model)
+	if key, _ := assistantEngineCredential(user, engine); strings.TrimSpace(key) == "" {
+		return assistantEngineMissingKey(engine), nil
 	}
-	model := bot.Model
+	model := strings.TrimSpace(bot.Model)
 	if model == "" {
 		model = domain.DefaultNotificationReportModel
 	}
-	if assistantAllowedModel(model, loadAssistantModels(ctx, user.CodeBuddyInternetEnvironment)) != model {
+	resolved, err := scheduledRunModel(ctx, model, user)
+	if err != nil {
 		return "所选模型不可用，请在 Bot 管理中重新选择。", nil
 	}
+	model = resolved
 	if err = ensureAssistantSessionDirs(user.ID); err != nil {
 		return "", err
 	}
@@ -139,7 +142,7 @@ func (h *assistantHandlers) generateBotReply(ctx context.Context, bot domain.Not
 					}
 				}
 			}
-			return redactAssistantSecrets(strings.ReplaceAll(reply.Message, user.CodeBuddyAPIKey, "[redacted]"), user), nil
+			return redactAssistantSecrets(reply.Message, user), nil
 		}
 		if ctx.Err() != nil {
 			return "", ctx.Err()

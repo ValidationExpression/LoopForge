@@ -149,9 +149,8 @@
   function renderList(menu, selectedId, onPick) {
     renderOptions(menu, catalog.models || [], selectedId, onPick);
   }
-  // Requirement clarification, Bot replies, run evals and the SOP preview
-  // build run on CodeBuddy only, so their pickers list CodeBuddy models and
-  // never offer a "codex:…" id the server would have to refuse.
+  // Requirement clarification, run evals and the SOP preview use
+  // renderCodeBuddyList; 企微 Bot 对话用 loadSchedule + renderList。
   function codeBuddyModels() {
     return (catalog.models || []).filter(m => (m.engine || 'codebuddy') === 'codebuddy');
   }
@@ -171,18 +170,28 @@
     if (!resp.ok) throw new Error(`模型列表加载失败（${resp.status}）`);
     return resp.json();
   }
+  function applyCatalog(data) {
+    if (Array.isArray(data?.models)) {
+      const models = data.models.filter(m => m.id !== DEFAULT_MODEL && m.id !== `${m.engine}:default`);
+      catalog = {default: data.default || DEFAULT_MODEL, models, engines: data.engines || []};
+    }
+    return catalog;
+  }
   // Share the in-flight request and retain the last catalog on a refresh failure.
   function load() {
     if (!loading) {
-      loading = fetchCatalog().then(data => {
-        if (Array.isArray(data?.models)) {
-          const models = data.models.filter(m => m.id !== DEFAULT_MODEL && m.id !== `${m.engine}:default`);
-          catalog = {default: data.default || DEFAULT_MODEL, models, engines: data.engines || []};
-        }
-        return catalog;
-      }).catch(() => catalog).finally(() => { loading = null; });
+      loading = fetchCatalog().then(applyCatalog).catch(() => catalog).finally(() => { loading = null; });
     }
     return loading;
+  }
+  async function loadSchedule() {
+    try {
+      const resp = await fetch('/api/assistant/models?schedule=1', {headers: {Accept: 'application/json'}, credentials: 'same-origin'});
+      if (!resp.ok) throw new Error(`模型列表加载失败（${resp.status}）`);
+      return applyCatalog(await resp.json());
+    } catch {
+      return load();
+    }
   }
   window.AgentFlowAssistantModels = {
     DEFAULT: DEFAULT_MODEL,
@@ -192,6 +201,7 @@
     codeBuddyModels,
     engineOf,
     load,
+    loadSchedule,
     paint,
     paintItem,
     renderCodeBuddyList,

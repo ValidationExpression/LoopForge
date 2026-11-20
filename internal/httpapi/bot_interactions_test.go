@@ -37,6 +37,37 @@ func botFixture(t *testing.T) (*repo.Store, *assistantHandlers, domain.Notificat
 	bindBotTestUser(t, s, bot, "bound-member", 42)
 	return s, h, bot
 }
+func TestBotReplyUsesSenderCLIKey(t *testing.T) {
+	s, h, bot := botFixture(t)
+	bot.Model = "codex:gpt-6-sol"
+	if err := s.SaveNotificationBot(bot, ""); err != nil {
+		t.Fatal(err)
+	}
+	s.UpdateUserCredentials(43, repo.UserCredentialUpdate{CodexAPIKey: "codex-user-secret"})
+	h.generate = func(ctx context.Context, prompt string, user domain.User) (string, error) {
+		if user.ID != 43 || user.CodexAPIKey != "codex-user-secret" {
+			t.Fatalf("expected codex credentials, got user %+v", user)
+		}
+		agentToolSessions.mu.Lock()
+		var session *AgentToolSession
+		for _, candidate := range agentToolSessions.sessions {
+			if candidate.Mode == AgentToolAssistant && candidate.UserID == 43 {
+				session = candidate
+			}
+		}
+		agentToolSessions.mu.Unlock()
+		if session == nil {
+			t.Fatal("missing assistant session")
+		}
+		session.commitFinal(AgentTerminalResult{Kind: AgentTerminalAssistant, Assistant: &assistantReply{Message: "codex-user-secret done"}})
+		return "", context.Canceled
+	}
+	reply, err := h.generateBotReply(context.Background(), bot, domain.BotConversation{SessionID: "codex-session", ChatType: "single"}, nil, domain.BotInteraction{SenderID: "new-wecom-user", Content: "进度"})
+	if err != nil || reply != "codex-user-secret done" {
+		t.Fatal(reply, err)
+	}
+}
+
 func TestBotUsesBoundSenderIdentityAutoModeAndSharedChatContext(t *testing.T) {
 	s, h, bot := botFixture(t)
 	h.generate = func(ctx context.Context, prompt string, user domain.User) (string, error) {
@@ -187,7 +218,7 @@ func TestBotUnboundAndMissingCredentialsNeverUseOwner(t *testing.T) {
 	}
 	s.UpdateUserCredentials(43, repo.UserCredentialUpdate{CodeBuddyAPIKeyClear: true})
 	reply, err = h.generateBotReply(context.Background(), bot, domain.BotConversation{}, nil, domain.BotInteraction{SenderID: "new-wecom-user", Content: "创建需求"})
-	if err != nil || !strings.Contains(reply, "你的平台账号尚未配置") {
+	if err != nil || !strings.Contains(reply, "请先在个人配置中配置") {
 		t.Fatal(reply, err)
 	}
 	project, _ := s.Project("p")

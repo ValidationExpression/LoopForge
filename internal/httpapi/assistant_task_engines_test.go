@@ -13,6 +13,20 @@ import (
 	"agentflow/internal/repo"
 )
 
+func TestNotificationBotModelValidAcceptsEnginePrefix(t *testing.T) {
+	t.Setenv("AGENTFLOW_ASSISTANT_MODELS", "glm-5.3-ioa")
+	for _, tc := range []struct{ in string; ok bool }{
+		{"codex:gpt-6-sol", true},
+		{"glm-5.3-ioa", true},
+		{"bad model", false},
+		{"codex:bad model", false},
+	} {
+		if got := notificationBotModelValid(tc.in); got != tc.ok {
+			t.Fatalf("notificationBotModelValid(%q) = %v, want %v", tc.in, got, tc.ok)
+		}
+	}
+}
+
 func TestAssistantScheduledModelKeepsCLIModels(t *testing.T) {
 	catalog := assistantFixedCatalog()
 	for in, want := range map[string]string{

@@ -449,6 +449,24 @@ func assistantModelFamily(id, engine string) string {
 	}
 }
 
+// notificationBotModelValid accepts Bot channel model settings, including
+// executor-prefixed IDs such as "codex:gpt-6-sol".
+func notificationBotModelValid(id string) bool {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return true
+	}
+	normalized := assistantScheduledModel(id, assistantKnownCatalog())
+	if normalized != id {
+		return false
+	}
+	engine, model := assistantModelEngine(normalized)
+	if engine != assistantEngineCodeBuddy {
+		return assistantValidEngineModel(model)
+	}
+	return assistantAllowedModel(normalized, assistantKnownCatalog()) == normalized
+}
+
 func assistantAllowedModel(id string, catalog assistantModelCatalog) string {
 	id = strings.TrimSpace(id)
 	if id == "" {
