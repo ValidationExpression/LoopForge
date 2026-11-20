@@ -1,0 +1,10 @@
+# Mihomo sidecar on the Docker host. Config: ${LOOPFORGE_DATA_DIR}/proxy/config.yaml
+name: loopforge-proxy
+services:
+  mihomo:
+    image: metacubex/mihomo:latest
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ${LOOPFORGE_DATA_DIR:?}/proxy:/root/.config/mihomo:ro
+    command: ["-f", "/root/.config/mihomo/config.yaml"]

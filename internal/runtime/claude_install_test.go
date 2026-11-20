@@ -175,3 +175,17 @@ func TestDockerfileBundlesTheOnDemandDeepSeekHarnessRelease(t *testing.T) {
 		t.Fatalf("Dockerfile must install @deepseek-ai/dsh@%s", DeepSeekHarnessVersion)
 	}
 }
+
+func TestDockerfileBundlesCursorCLI(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, CursorBundledInstallRoot) {
+		t.Fatalf("Dockerfile must install cursor-agent under %s", CursorBundledInstallRoot)
+	}
+	if !strings.Contains(text, "cursor.com/install") {
+		t.Fatal("Dockerfile must use the official Cursor installer")
+	}
+}

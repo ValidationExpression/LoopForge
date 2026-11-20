@@ -1,0 +1,14 @@
+[Unit]
+Description=LoopForge outbound proxy (mihomo)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/mihomo -f %h/apps/LoopForge/.data/proxy/config.yaml
+Restart=always
+RestartSec=5
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=default.target

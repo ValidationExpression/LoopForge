@@ -11,10 +11,10 @@ import (
 	"sync"
 )
 
-// CLIs the published platform image does not guarantee. Codex, CodeBuddy and
-// DeepSeek Harness are baked into that image; the rest are installed only after
-// a person asks from a failed conversation. Package names and installer URLs are fixed:
-// the request may choose an engine, never a URL or a package.
+// CLIs the published platform image does not guarantee. Codex, CodeBuddy, Cursor
+// and DeepSeek Harness are baked into that image; the rest are installed only
+// after a person asks from a failed conversation. Package names and installer
+// URLs are fixed: the request may choose an engine, never a URL or a package.
 const (
 	cursorInstallerURL  = "https://cursor.com/install"
 	agyInstallerURL     = "https://antigravity.google/cli/install.sh"
@@ -47,7 +47,7 @@ func onDemandCLICatalog() map[string]onDemandCLI {
 		"codebuddy":   {Engine: "codebuddy", Binary: "codebuddy", Package: "@tencent-ai/codebuddy-code", Bundled: true},
 		"claude-code": {Engine: "claude-code", Binary: "claude", Package: "@anthropic-ai/claude-code"},
 		"opencode":    {Engine: "opencode", Binary: "opencode", Package: "opencode-ai"},
-		"cursor":      {Engine: "cursor", Binary: "cursor-agent", Script: cursorInstallScript},
+		"cursor":      {Engine: "cursor", Binary: "cursor-agent", Bundled: true},
 		"agy":         {Engine: "agy", Binary: "agy", Script: agyInstallScript},
 		"kimi":        {Engine: "kimi", Binary: "kimi", Package: "@moonshot-ai/kimi-code"},
 		"pi":          {Engine: "pi", Binary: "pi", Package: "@earendil-works/pi-coding-agent"},
@@ -77,6 +77,11 @@ func OnDemandCLIPath(engine string) (string, bool) {
 }
 
 func onDemandBinary(spec onDemandCLI) string {
+	if spec.Bundled {
+		if path := bundledCLIExecutable(spec.Binary); path != "" {
+			return path
+		}
+	}
 	if spec.Script != "" {
 		home, err := os.UserHomeDir()
 		if err != nil || strings.TrimSpace(home) == "" {
@@ -109,6 +114,11 @@ func InstallOnDemandCLI(ctx context.Context, engine string) (string, error) {
 	var path string
 	var err error
 	switch {
+	case spec.Bundled && spec.Package == "" && spec.Script == "":
+		if path = bundledCLIExecutable(spec.Binary); path != "" {
+			return path, nil
+		}
+		err = errors.New("当前环境没有随平台镜像发布的 CLI")
 	case spec.Engine == "claude-code":
 		path, err = EnsureClaudeCode(ctx)
 	case spec.Script != "":

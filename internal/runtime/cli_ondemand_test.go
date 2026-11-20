@@ -86,34 +86,25 @@ func TestInstallOnDemandCLIReportsNPMFailureWithoutActivating(t *testing.T) {
 	}
 }
 
-func TestInstallOnDemandCLIInstallsCursorWithOfficialInstaller(t *testing.T) {
-	home := t.TempDir()
-	log := filepath.Join(t.TempDir(), "bash.log")
-	t.Setenv("HOME", home)
-	t.Setenv("BASH_TEST_LOG", log)
-	useFakeCommands(t, map[string]string{"bash": `#!/bin/sh
-printf '%s\n' "$*" >> "$BASH_TEST_LOG"
-mkdir -p "$HOME/.local/bin"
-printf '#!/bin/sh\necho cursor\n' > "$HOME/.local/bin/cursor-agent"
-chmod 755 "$HOME/.local/bin/cursor-agent"
-`})
+func TestInstallOnDemandCLIUsesBundledCursor(t *testing.T) {
+	root := t.TempDir()
+	bin := filepath.Join(root, ".local", "bin", "cursor-agent")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AGENTFLOW_CURSOR_BUNDLED_ROOT", root)
 	path, err := InstallOnDemandCLI(context.Background(), "cursor")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != filepath.Join(home, ".local", "bin", "cursor-agent") {
-		t.Fatalf("binary %q", path)
-	}
-	calls, _ := os.ReadFile(log)
-	if !strings.Contains(string(calls), "https://cursor.com/install") {
-		t.Fatalf("installer: %s", calls)
+	if path != bin {
+		t.Fatalf("binary %q, want %q", path, bin)
 	}
 	if _, err := InstallOnDemandCLI(context.Background(), "cursor"); err != nil {
 		t.Fatal(err)
-	}
-	calls, _ = os.ReadFile(log)
-	if strings.Count(string(calls), "\n") != 1 {
-		t.Fatalf("installer ran twice: %s", calls)
 	}
 }
 

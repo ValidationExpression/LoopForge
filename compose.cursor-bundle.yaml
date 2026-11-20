@@ -1,0 +1,5 @@
+# Persist cursor-agent on LOOPFORGE_DATA_DIR (survives platform recreate without a custom image).
+services:
+  platform:
+    volumes:
+      - ${LOOPFORGE_DATA_DIR:?}/cursor-agent:/opt/loopforge/cursor-cli:ro

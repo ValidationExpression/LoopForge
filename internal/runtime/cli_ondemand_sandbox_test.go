@@ -177,8 +177,8 @@ func TestDockerSandboxOnDemandCLIPathSkipsWithoutInstalling(t *testing.T) {
 func TestOnDemandCLICatalogMarksBundledCLIs(t *testing.T) {
 	catalog := onDemandCLICatalog()
 	for engine, want := range map[string]bool{
-		"codex": true, "codebuddy": true, "dsh": true,
-		"claude-code": false, "opencode": false, "cursor": false, "agy": false, "kimi": false, "pi": false,
+		"codex": true, "codebuddy": true, "dsh": true, "cursor": true,
+		"claude-code": false, "opencode": false, "agy": false, "kimi": false, "pi": false,
 	} {
 		if got := catalog[engine].Bundled; got != want {
 			t.Fatalf("%s bundled = %v, want %v", engine, got, want)

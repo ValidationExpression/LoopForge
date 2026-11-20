@@ -193,11 +193,35 @@ func EnsureToolchainCLI(dir, binary string) error {
 		return nil
 	}
 	prefixBin := filepath.Join(toolchainNodePrefix, "bin")
-	target, err := os.Readlink(filepath.Join(prefixBin, binary))
-	pkg, ok := toolchainPackage(target)
-	if err != nil || !ok {
+	launcher := filepath.Join(dir, "bin", binary)
+	if fileIsExecutable(launcher) {
 		return nil
 	}
+	target, err := os.Readlink(filepath.Join(prefixBin, binary))
+	pkg, ok := toolchainPackage(target)
+	if err == nil && ok {
+		unlock, err := lockToolchain(filepath.Dir(dir))
+		if err != nil {
+			return err
+		}
+		defer unlock()
+		if fileIsExecutable(launcher) {
+			return nil
+		}
+		if err := installToolchainPackage(dir, binary, pkg); err != nil {
+			return err
+		}
+		return linkToolchainLaunchers(dir, pkg)
+	}
+	if root := bundledCLIInstallRoot(binary); root != "" {
+		return ensureToolchainBundledCLI(dir, binary, root)
+	}
+	return nil
+}
+
+// ensureToolchainBundledCLI copies a non-npm CLI tree from the platform image
+// into the toolchain and links its launcher under dir/bin.
+func ensureToolchainBundledCLI(dir, binary, root string) error {
 	launcher := filepath.Join(dir, "bin", binary)
 	if fileIsExecutable(launcher) {
 		return nil
@@ -210,10 +234,26 @@ func EnsureToolchainCLI(dir, binary string) error {
 	if fileIsExecutable(launcher) {
 		return nil
 	}
-	if err := installToolchainPackage(dir, binary, pkg); err != nil {
+	dest := filepath.Join(dir, "bundled", filepath.Base(root))
+	if err := copyPreserving(dest, root); err != nil {
+		return fmt.Errorf("复制 %s 失败：%w", binary, err)
+	}
+	src := filepath.Join(dest, ".local", "bin", binary)
+	if !fileIsExecutable(src) {
+		src = filepath.Join(toolchainNodePrefix, "bin", binary)
+	}
+	if !fileIsExecutable(src) {
+		return fmt.Errorf("复制 %s 失败：镜像中没有可执行文件", binary)
+	}
+	if err := os.MkdirAll(filepath.Dir(launcher), 0o755); err != nil {
 		return err
 	}
-	return linkToolchainLaunchers(dir, pkg)
+	rel, err := filepath.Rel(filepath.Dir(launcher), src)
+	if err != nil {
+		return err
+	}
+	_ = os.Remove(launcher)
+	return os.Symlink(rel, launcher)
 }
 
 // installToolchainPackage copies npm package pkg from the platform image into

@@ -236,6 +236,38 @@ func TestEnsureToolchainCLICopiesScopedPackageAndAllItsLaunchers(t *testing.T) {
 	}
 }
 
+func TestEnsureToolchainCLICopiesBundledCursor(t *testing.T) {
+	cursorRoot := t.TempDir()
+	bin := filepath.Join(cursorRoot, ".local", "bin", "cursor-agent")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\necho cursor\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	prefix := writeToolchainFixture(t)
+	cliDir := t.TempDir()
+	useToolchainFixture(t, prefix, cliDir)
+	t.Setenv("AGENTFLOW_CURSOR_BUNDLED_ROOT", cursorRoot)
+	if err := os.Symlink(bin, filepath.Join(prefix, "bin", "cursor-agent")); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := RuntimeToolchainDir()
+	if err != nil || dir == "" {
+		t.Fatalf("RuntimeToolchainDir() = %q, %v", dir, err)
+	}
+	if err := EnsureToolchainCLI(dir, "cursor-agent"); err != nil {
+		t.Fatal(err)
+	}
+	launcher := filepath.Join(dir, "bin", "cursor-agent")
+	if !fileIsExecutable(launcher) {
+		t.Fatal("cursor-agent launcher missing")
+	}
+	if !fileIsExecutable(filepath.Join(dir, "bundled", filepath.Base(cursorRoot), ".local", "bin", "cursor-agent")) {
+		t.Fatal("cursor tree not copied into the toolchain")
+	}
+}
+
 // Binaries the platform image does not bundle as an npm launcher are left to
 // the sandbox installer: nothing is copied and no lock is taken.
 func TestEnsureToolchainCLIIgnoresUnbundledBinaries(t *testing.T) {
