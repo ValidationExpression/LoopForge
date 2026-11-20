@@ -1,5 +1,7 @@
 # 203 长期稳定：Cursor 代理 + cursor-agent 持久化
 
+代码来源与合并官方更新的步骤见 **[GIT-WORKFLOW.md](./GIT-WORKFLOW.md)**（`upstream` / `origin`、`main` / `deploy/203-cursor`）。
+
 ## 已部署组件
 
 1. **mihomo**（用户级 systemd `loopforge-mihomo.service`）  
